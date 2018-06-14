@@ -1,0 +1,1 @@
+packer build -var 'proj_id=articulate-area-202208' -var 'machine_type=f1-micro' ubuntu16-vars.json
