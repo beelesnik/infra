@@ -2,7 +2,7 @@
   "builders": [
     {
     "type": "googlecompute",
-    "project_id": "articulate-area-202208",
+    "project_id": "infra-207323",
     "image_name": "reddit-base-{{timestamp}}",
     "source_image": "ubuntu-1604-xenial-v20180612",
     "zone": "europe-west1-b",
