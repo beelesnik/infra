@@ -1,77 +1,73 @@
-# Setup and configure ruby things for reddit app
-- name: "Reddit App: Configure app environment"
+---
+- name: Configure hosts & deploy application
   hosts: all
-  gather_facts: no
-  become: yes
-
-  tasks:
-  - name: Install ruby and rubygems and required packages
-    apt: "name={{ item }} state=present"
-    with_items:
-      - ruby-full
-      - ruby-dev
-      - build-essential
-
-  - name: Install Ruby bundler
-    gem:
-      name: bundler
-      state: present
-      user_install: no
-
-# Setup and configure mongodb for reddit app
-- name: "Reddit App: Install mongodb"
-  hosts: all
-  gather_facts: no
-  become: yes 
-
-  tasks:
-  - name: Add mongodb key
-    apt_key:
-      keyserver: keyserver.ubuntu.com
-      id: EA312927
-  
-  - name: Add mongodb repo
-    apt_repository:
-      repo: deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse
-      state: present
-
-  - name: Install mongodb package
-    apt:
-      name: mongodb-org
-      update_cache: yes
-
-  - name: Enable and start mongod service
-    systemd:
-      name: mongod
-      enabled: yes
-      state: started
-
-# Deploy reddit app
-- name: "Reddit App: Deploy application"
-  hosts: all
-  gather_facts: no
-  become: yes
   vars:
-    work_dir: /opt/reddit
-
+    mongo_bind_ip: 0.0.0.0
+    db_host: 10.132.0.3
   tasks:
-  - name: Git clone reddit app
-    git:
-      repo: https://github.com/Artemmkin/reddit.git
-      dest: "{{ work_dir }}"
+    - name: Change mongo config file
+      become: true
+      template:
+        src: templates/mongod.conf.j2
+        dest: /etc/mongod.conf
+        mode: 0644
+      tags: db-tag
+      notify: restart mongod
 
-  - name: Start reddit app - install bundle
-    command: bundle install
-    args:
-      chdir: "{{ work_dir }}"
+    - name: Fetch the latest version of application code
+      git:
+        repo: 'https://github.com/Artemmkin/reddit.git'
+        dest: /home/appuser/reddit
+        version: monolith
+      tags: deploy-tag
+      notify: restart puma
 
-  - name: copy puma.service file
-    copy:
-      src: puma.service
-      dest: /etc/systemd/system/puma.service
+    - name: Puma gem install
+      command: gem install --user-install puma
+      tags: app-tag
 
-  - name: Start reddit app - start puma
-    systemd: 
-      name: puma
-      enabled: yes
-      state: started
+    - name: install bundler package
+      apt:
+        name: ruby-bundler
+        state: present
+
+
+    - name: Bundle install
+      bundler:
+        state: present
+        user_install: yes
+        chdir: /home/appuser/reddit
+      tags: deploy-tag
+      notify: restart puma
+
+    - name: Add unit file for Puma
+      become: true
+      copy:
+        src: files/puma.service
+        dest: /etc/systemd/system/puma.service
+      tags: app-tag
+      notify: reload puma
+
+    - name: Add config for DB connection
+      template:
+        src: templates/db_config.j2
+        dest: /home/appuser/db_config
+      tags: app-tag
+
+    - name: enable puma
+      become: true
+      systemd: name=puma enabled=yes
+      tags: app-tag
+
+  handlers:
+  - name: restart mongod
+    become: true
+    service: name=mongod state=restarted
+
+  - name: reload puma
+    become: true
+    systemd: name=puma state=reloaded
+
+  - name: restart puma
+    become: true
+    systemd: name=puma state=restarted

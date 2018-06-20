@@ -1,1 +1,0 @@
-ansible-playbook -u sergei -i inventory reddit_app.yml  --start-at-task="Git clone reddit app"
