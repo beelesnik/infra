@@ -1,0 +1,76 @@
+---
+- name: Configure MongoDB
+  hosts: db
+  tags: db-tag
+  become: true
+  vars:
+    mongo_bind_ip: 0.0.0.0
+  tasks:
+    - name: Change mongo config file
+      template:
+        src: templates/mongod.conf.j2
+        dest: /etc/mongod.conf
+        mode: 0644
+      notify: restart mongod
+
+  handlers:
+  - name: restart mongod
+    service: name=mongod state=restarted
+
+- name: Configure App
+  hosts: app
+  tags: app-tag
+  become: true
+  vars:
+    db_host: 10.132.0.3
+  tasks:
+    - name: Add unit file for Puma
+      copy:
+        src: files/puma.service
+        dest: /etc/systemd/system/puma.service
+      notify: reload puma
+
+    - name: Add config for DB connection
+      template:
+        src: templates/db_config.j2
+        dest: /home/appuser/db_config
+        owner: appuser
+        group: appuser
+
+    - name: install bundler package
+      apt:
+        name: ruby-bundler
+        state: present
+
+    - name: enable puma
+      systemd: name=puma enabled=yes
+
+  handlers:
+  - name: reload puma
+    systemd: name=puma state=reloaded
+
+- name: Deploy App
+  hosts: app
+  tags: deploy-tag
+  become: false
+  tasks:
+    - name: Fetch the latest version of application code
+      git:
+        repo: 'https://github.com/Artemmkin/reddit.git'
+        dest: /home/appuser/reddit
+        version: monolith
+
+    - name: Puma gem install
+      command: gem install --user-install puma
+
+    - name: Bundle install
+      bundler:
+        state: present
+        user_install: yes
+        chdir: /home/appuser/reddit
+      notify: restart puma
+
+  handlers:
+  - name: restart puma
+    become: true
+    systemd: name=puma state=restarted
