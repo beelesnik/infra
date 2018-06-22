@@ -1,0 +1,91 @@
+sergei@node1:~/infra/ansible-2$ nano ansible.cfg 
+sergei@node1:~/infra/ansible-2$ ansible-config view
+[defaults]
+inventory = hosts
+remote_user = appuser
+private_key_ﬁle = ~/.ssh/appuser
+host_key_checking = False
+sergei@node1:~/infra/ansible-2$ ansible dbserver -m ping
+dbserver | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+sergei@node1:~/infra/ansible-2$ ansible appserver -m ping
+appserver | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+sergei@node1:~/infra/ansible-2$ ansible dbserver -m command -a uptime 
+dbserver | SUCCESS | rc=0 >>
+ 07:53:40 up 39 min,  1 user,  load average: 0.05, 0.01, 0.00
+
+sergei@node1:~/infra/ansible-2$ ansible appserver -m command -a uptime 
+appserver | SUCCESS | rc=0 >>
+ 07:53:51 up 40 min,  1 user,  load average: 0.00, 0.00, 0.00
+
+sergei@node1:~/infra/ansible-2$
+
+sergei@node1:~/infra/ansible-2$ ansible app -m ping 
+appserver | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+sergei@node1:~/infra/ansible-2$ ansible db -m ping 
+dbserver | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+sergei@node1:~/infra/ansible-2$ ansible all -m ping 
+appserver | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+dbserver | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+
+
+sergei@node1:~/infra/ansible-2$ ansible-playbook reddit_app.yml --check --limit db
+
+PLAY [Configure hosts & deploy application] ****************************************************************************************************************************************************************
+
+TASK [Gathering Facts] *************************************************************************************************************************************************************************************
+ok: [dbserver]
+
+TASK [Change mongo config file] ****************************************************************************************************************************************************************************
+changed: [dbserver]
+
+RUNNING HANDLER [restart mongod] ***************************************************************************************************************************************************************************
+changed: [dbserver]
+
+PLAY RECAP *************************************************************************************************************************************************************************************************
+dbserver                   : ok=3    changed=2    unreachable=0    failed=0   
+
+sergei@node1:~/infra/ansible-2$ 
+
+
+
+sergei@node1:~/infra/ansible-2$ ansible-playbook reddit_app.yml --check --limit app --tags app-tag
+
+PLAY [Configure hosts & deploy application] ****************************************************************************************************************************************************************
+
+TASK [Gathering Facts] *************************************************************************************************************************************************************************************
+ok: [appserver]
+
+TASK [Add unit file for Puma] ******************************************************************************************************************************************************************************
+changed: [appserver]
+
+TASK [Add config for DB connection] ************************************************************************************************************************************************************************
+changed: [appserver]
+
+TASK [enable puma] *****************************************************************************************************************************************************************************************
+changed: [appserver]
+
+RUNNING HANDLER [reload puma] ******************************************************************************************************************************************************************************
+changed: [appserver]
+
+PLAY RECAP *************************************************************************************************************************************************************************************************
+appserver                  : ok=5    changed=4    unreachable=0    failed=0   
+
+sergei@node1:~/infra/ansible-2$

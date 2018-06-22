@@ -1,0 +1,24 @@
+- name: Deploy App
+  hosts: app
+  become: false
+  tasks:
+    - name: Fetch the latest version of application code
+      git:
+        repo: 'https://github.com/Artemmkin/reddit.git'
+        dest: /home/appuser/reddit
+        version: monolith
+
+    - name: Puma gem install
+      command: gem install --user-install puma
+
+    - name: Bundle install
+      bundler:
+        state: present
+        user_install: yes
+        chdir: /home/appuser/reddit
+      notify: restart puma
+
+  handlers:
+  - name: restart puma
+    become: true
+    systemd: name=puma state=restarted
